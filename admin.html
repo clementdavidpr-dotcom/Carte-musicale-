@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Carte Musicale</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital@0;1&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0e1a26;--surface:#152030;--surface2:#1c2d40;--border:#253a52;--text:#e4edf8;--muted:#5e80a0;--accent:#38a0ff;--green:#22c55e;--orange:#f0a030;--red:#ff4466;--shadow:0 4px 20px rgba(0,0,0,.45);--shadow-lg:0 16px 56px rgba(0,0,0,.65)}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:56px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;gap:16px}
+.logo{font-family:'Playfair Display',serif;font-size:1.1rem;display:flex;align-items:center;gap:8px}
+.admin-badge{background:rgba(255,200,50,.12);border:1px solid rgba(255,200,50,.3);color:#f0c830;border-radius:6px;padding:3px 10px;font-size:.75rem;font-weight:700}
+.btn{font-family:'Outfit',sans-serif;font-size:.8rem;font-weight:500;padding:6px 14px;border-radius:8px;border:none;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#5ab0ff}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}.btn-ghost:hover{background:var(--surface2);color:var(--text)}
+.btn-green{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3)}.btn-green:hover{background:rgba(34,197,94,.25)}
+.btn-danger{background:rgba(255,68,102,.12);color:var(--red);border:1px solid rgba(255,68,102,.28)}.btn-danger:hover{background:rgba(255,68,102,.22)}
+.btn-orange{background:rgba(240,160,48,.12);color:var(--orange);border:1px solid rgba(240,160,48,.28)}.btn-orange:hover{background:rgba(240,160,48,.22)}
+.btn-sm{padding:3px 9px;font-size:.72rem}
+main{max-width:1100px;margin:0 auto;padding:28px 20px;display:flex;flex-direction:column;gap:28px}
+
+/* INSTANCES */
+.section-title{font-family:'Playfair Display',serif;font-size:1.1rem;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.instances-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.instance-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.instance-card h3{font-size:.95rem;font-weight:600}
+.instance-meta{font-size:.75rem;color:var(--muted)}
+.instance-actions{display:flex;gap:6px;flex-wrap:wrap}
+.new-instance{background:var(--surface2);border:2px dashed var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.new-instance input{width:100%;font-family:'Outfit',sans-serif;font-size:.88rem;padding:7px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);outline:none}
+.new-instance input:focus{border-color:var(--accent)}
+.new-instance input::placeholder{color:var(--muted)}
+
+/* PINS */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:16px}
+.tab{padding:7px 16px;font-size:.82rem;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;transition:all .15s;background:none;border-top:none;border-left:none;border-right:none;font-family:'Outfit',sans-serif}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab:hover{color:var(--text)}
+.count-badge{background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:.65rem;font-weight:700;margin-left:5px}
+.count-badge.green{background:var(--green)}
+
+.pin-row{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:14px;display:flex;gap:14px;align-items:flex-start}
+.pin-row+.pin-row{margin-top:8px}
+.pin-row.pending{border-color:rgba(240,160,48,.4)}
+.pin-info{flex:1;min-width:0}
+.pin-header{display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap}
+.pin-author{font-weight:700;font-size:.88rem}
+.pin-country{background:var(--accent-dim);color:var(--accent);border-radius:5px;padding:2px 8px;font-size:.72rem;cursor:pointer}
+.pin-country:hover{background:#1e5080}
+.pin-title{font-size:.85rem;color:var(--muted);margin-bottom:6px}
+.pin-date{font-size:.68rem;color:var(--muted)}
+.pin-links{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.pin-link{font-size:.72rem;color:var(--accent);text-decoration:none;background:var(--accent-dim);padding:2px 8px;border-radius:4px}
+.pin-link:hover{background:#1e5080}
+.pin-actions{display:flex;gap:6px;flex-direction:column;flex-shrink:0}
+.country-select{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.76rem;padding:4px 8px;width:160px;cursor:pointer}
+.empty-msg{text-align:center;padding:32px;color:var(--muted);font-size:.85rem}
+
+/* EXPORT */
+.export-section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px}
+.export-desc{font-size:.83rem;color:var(--muted);margin-bottom:14px;line-height:1.6}
+.export-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.export-row select{background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.84rem;padding:7px 11px;cursor:pointer;flex:1;min-width:160px}
+
+/* LOGIN */
+.login-wall{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:900}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:36px;width:100%;max-width:380px;box-shadow:var(--shadow-lg);text-align:center}
+.login-box h2{font-family:'Playfair Display',serif;font-size:1.4rem;margin-bottom:8px}
+.login-box p{color:var(--muted);font-size:.84rem;margin-bottom:22px}
+.login-box input{width:100%;font-family:'Outfit',sans-serif;font-size:.9rem;padding:9px 13px;border:1px solid var(--border);border-radius:9px;background:var(--bg);color:var(--text);outline:none;margin-bottom:12px}
+.login-box input:focus{border-color:var(--accent)}
+.login-error{color:var(--red);font-size:.78rem;margin-bottom:10px;display:none}
+.login-error.show{display:block}
+
+#notif{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(8px);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 18px;border-radius:20px;font-size:.8rem;z-index:800;pointer-events:none;opacity:0;transition:opacity .3s,transform .3s;white-space:nowrap;box-shadow:var(--shadow)}
+#notif.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media(max-width:600px){.pin-row{flex-direction:column}.pin-actions{flex-direction:row}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN WALL -->
+<div class="login-wall" id="login-wall">
+  <div class="login-box">
+    <div style="font-size:2.2rem;margin-bottom:12px">🔐</div>
+    <h2>Accès Admin</h2>
+    <p>Entre le mot de passe professeur</p>
+    <input type="password" id="admin-pwd" placeholder="Mot de passe…" autocomplete="off">
+    <div class="login-error" id="admin-err">Mot de passe incorrect.</div>
+    <button class="btn btn-primary" style="width:100%" onclick="checkPwd()">Entrer</button>
+  </div>
+</div>
+
+<header>
+  <div class="logo">🎵 Carte Musicale <span class="admin-badge">ADMIN</span></div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="btn btn-ghost" onclick="window.open('carte-musicale.html','_blank')">Voir la carte ↗</button>
+  </div>
+</header>
+
+<main>
+  <!-- INSTANCES -->
+  <div>
+    <div class="section-title">🗂 Instances de cartes</div>
+    <div class="instances-grid" id="instances-grid">
+      <div class="new-instance">
+        <div style="font-size:.82rem;color:var(--muted)">Créer une nouvelle carte</div>
+        <input type="text" id="new-instance-name" placeholder="Nom (ex: 6ème A, Club musique…)" maxlength="30">
+        <button class="btn btn-primary btn-sm" onclick="createInstance()">+ Créer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODERATION -->
+  <div>
+    <div class="section-title">🎵 Modération des contributions</div>
+    <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <label style="font-size:.8rem;color:var(--muted)">Carte :</label>
+      <select id="mod-instance-select" onchange="loadPins()" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.82rem;padding:5px 10px;cursor:pointer">
+        <option value="default">default</option>
+      </select>
+    </div>
+    <div class="tabs">
+      <button class="tab active" id="tab-pending" onclick="switchTab('pending')">En attente <span class="count-badge" id="badge-pending">0</span></button>
+      <button class="tab" id="tab-approved" onclick="switchTab('approved')">Validées <span class="count-badge green" id="badge-approved">0</span></button>
+    </div>
+    <div id="pins-container"></div>
+  </div>
+
+  <!-- EXPORT -->
+  <div class="export-section">
+    <div class="section-title">📄 Exporter une carte en HTML permanent</div>
+    <p class="export-desc">Génère un fichier HTML autonome (sans Firebase, sans connexion requise) avec toutes les contributions validées. Parfait pour archiver une carte terminée comme ressource web permanente.</p>
+    <div class="export-row">
+      <select id="export-select">
+        <option value="default">default</option>
+      </select>
+      <button class="btn btn-primary" onclick="exportMap()">📥 Exporter en HTML</button>
+    </div>
+  </div>
+</main>
+
+<div id="notif"></div>
+
+<script>
+// ═══════════════════════════════════════
+// FIREBASE
+// ═══════════════════════════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyD4xo5KNByAReUu2Hm5SRvO7Ru93ZRaVOw",
+  authDomain: "carte-mus.firebaseapp.com",
+  databaseURL: "https://carte-mus-default-rtdb.firebaseio.com",
+  projectId: "carte-mus",
+  storageBucket: "carte-mus.firebasestorage.app",
+  messagingSenderId: "914153709811",
+  appId: "1:914153709811:web:29dfea31126f910740d786"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ═══════════════════════════════════════
+// ADMIN PASSWORD  (change this!)
+// ═══════════════════════════════════════
+const ADMIN_PASSWORD = 'musique2025';
+
+function checkPwd(){
+  const v=document.getElementById('admin-pwd').value;
+  if(v===ADMIN_PASSWORD){
+    document.getElementById('login-wall').style.display='none';
+    sessionStorage.setItem('admin_ok','1');
+    init();
+  } else {
+    document.getElementById('admin-err').classList.add('show');
+  }
+}
+document.getElementById('admin-pwd').addEventListener('keydown',e=>{if(e.key==='Enter')checkPwd()});
+if(sessionStorage.getItem('admin_ok')==='1'){
+  document.getElementById('login-wall').style.display='none';
+  init();
+}
+
+// ═══════════════════════════════════════
+// COUNTRY DATA (subset for display)
+// ═══════════════════════════════════════
+const COUNTRY_DATA={4:'Afghanistan',8:'Albanie',12:'Algérie',20:'Andorre',24:'Angola',28:'Antigua-et-Barbuda',31:'Azerbaïdjan',32:'Argentine',36:'Australie',40:'Autriche',44:'Bahamas',48:'Bahreïn',50:'Bangladesh',51:'Arménie',52:'Barbade',56:'Belgique',64:'Bhoutan',68:'Bolivie',70:'Bosnie-Herzégovine',72:'Botswana',76:'Brésil',84:'Belize',90:'Îles Salomon',96:'Brunéi',100:'Bulgarie',104:'Myanmar',108:'Burundi',112:'Biélorussie',116:'Cambodge',120:'Cameroun',124:'Canada',132:'Cap-Vert',140:'Rép. centrafricaine',144:'Sri Lanka',148:'Tchad',152:'Chili',156:'Chine',158:'Taïwan',170:'Colombie',174:'Comores',180:'Rép. dém. du Congo',188:'Costa Rica',191:'Croatie',192:'Cuba',196:'Chypre',203:'République tchèque',204:'Bénin',208:'Danemark',212:'Dominique',214:'Rép. dominicaine',218:'Équateur',222:'Salvador',226:'Guinée équatoriale',231:'Éthiopie',232:'Érythrée',233:'Estonie',242:'Fidji',246:'Finlande',250:'France',262:'Djibouti',266:'Gabon',268:'Géorgie',270:'Gambie',275:'Palestine',276:'Allemagne',288:'Ghana',300:'Grèce',304:'Groenland',320:'Guatemala',324:'Guinée',328:'Guyana',332:'Haïti',336:'Vatican',340:'Honduras',344:'Hong Kong',348:'Hongrie',352:'Islande',356:'Inde',360:'Indonésie',364:'Iran',368:'Irak',372:'Irlande',376:'Israël',380:'Italie',384:"Côte d'Ivoire",388:'Jamaïque',392:'Japon',398:'Kazakhstan',400:'Jordanie',404:'Kenya',408:'Corée du Nord',410:'Corée du Sud',414:'Koweït',417:'Kirghizistan',418:'Laos',422:'Liban',426:'Lesotho',428:'Lettonie',430:'Libéria',434:'Libye',440:'Lituanie',442:'Luxembourg',450:'Madagascar',454:'Malawi',458:'Malaisie',462:'Maldives',466:'Mali',470:'Malte',478:'Mauritanie',480:'Maurice',484:'Mexique',492:'Monaco',496:'Mongolie',498:'Moldavie',499:'Monténégro',504:'Maroc',508:'Mozambique',512:'Oman',516:'Namibie',524:'Népal',528:'Pays-Bas',548:'Vanuatu',554:'Nouvelle-Zélande',558:'Nicaragua',562:'Niger',566:'Nigéria',578:'Norvège',586:'Pakistan',591:'Panama',598:'Papouasie-Nlle-Guinée',600:'Paraguay',604:'Pérou',608:'Philippines',616:'Pologne',620:'Portugal',624:'Guinée-Bissau',626:'Timor oriental',630:'Porto Rico',634:'Qatar',642:'Roumanie',643:'Russie',646:'Rwanda',659:'Saint-Kitts-et-Nevis',662:'Sainte-Lucie',670:'Saint-Vincent',674:'Saint-Marin',678:'Sao Tomé',682:'Arabie saoudite',686:'Sénégal',688:'Serbie',694:'Sierra Leone',702:'Singapour',703:'Slovaquie',704:'Vietnam',705:'Slovénie',706:'Somalie',710:'Afrique du Sud',716:'Zimbabwe',724:'Espagne',728:'Soudan du Sud',729:'Soudan',740:'Suriname',748:'Eswatini',752:'Suède',756:'Suisse',760:'Syrie',762:'Tadjikistan',764:'Thaïlande',768:'Togo',776:'Tonga',780:'Trinité-et-Tobago',784:'Émirats arabes unis',788:'Tunisie',792:'Turquie',795:'Turkménistan',800:'Ouganda',804:'Ukraine',807:'Macédoine du Nord',818:'Égypte',826:'Royaume-Uni',834:'Tanzanie',840:'États-Unis',854:'Burkina Faso',858:'Uruguay',860:'Ouzbékistan',862:'Venezuela',882:'Samoa',887:'Yémen',894:'Zambie'};
+function getCountryName(id){return COUNTRY_DATA[id]||COUNTRY_DATA[+id]||`Pays ${id}`}
+
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+let allInstances = ['default'];
+let currentMod = 'default';
+let currentTab = 'pending';
+let allPinsData = {};
+
+function init(){
+  // Load all instances list
+  db.ref('instances').on('value', snap=>{
+    const val = snap.val()||{};
+    allInstances = Object.keys(val).length ? Object.keys(val) : ['default'];
+    renderInstances();
+    populateSelects();
+  });
+  loadPins();
+}
+
+// ═══════════════════════════════════════
+// INSTANCES
+// ═══════════════════════════════════════
+function renderInstances(){
+  const grid = document.getElementById('instances-grid');
+  const existing = allInstances.map(name=>{
+    return `<div class="instance-card">
+      <h3>🗺 ${name}</h3>
+      <div class="instance-meta" id="meta-${name}">Chargement…</div>
+      <div class="instance-actions">
+        <button class="btn btn-ghost btn-sm" onclick="window.open('carte-musicale.html?map=${encodeURIComponent(name)}','_blank')">Ouvrir ↗</button>
+        <button class="btn btn-ghost btn-sm" onclick="copyLink('${name}')">📋 Copier lien</button>
+        ${name!=='default'?`<button class="btn btn-danger btn-sm" onclick="deleteInstance('${name}')">🗑 Supprimer</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  grid.innerHTML = existing + `<div class="new-instance">
+    <div style="font-size:.82rem;color:var(--muted)">Créer une nouvelle carte</div>
+    <input type="text" id="new-instance-name" placeholder="Nom (ex: 6ème A, Club musique…)" maxlength="30">
+    <button class="btn btn-primary btn-sm" onclick="createInstance()">+ Créer</button>
+  </div>`;
+  // Load stats per instance
+  allInstances.forEach(name=>{
+    db.ref('instances/'+name+'/pins').once('value', snap=>{
+      const data=snap.val()||{};
+      let pending=0,approved=0;
+      Object.values(data).forEach(country=>{Object.values(country).forEach(p=>{if(p.status==='pending')pending++;else if(p.status==='approved')approved++;})});
+      const el=document.getElementById('meta-'+name);
+      if(el) el.textContent=`✅ ${approved} validée(s) · ⏳ ${pending} en attente`;
+    });
+  });
+}
+
+function createInstance(){
+  const name=document.getElementById('new-instance-name').value.trim();
+  if(!name){showNotif('Donne un nom à la carte.');return}
+  if(allInstances.includes(name)){showNotif('Ce nom existe déjà.');return}
+  db.ref('instances/'+name+'/meta').set({created:new Date().toISOString(),name});
+  showNotif(`Carte "${name}" créée ! 🗺`);
+}
+
+function deleteInstance(name){
+  if(!confirm(`Supprimer la carte "${name}" et toutes ses données ?`))return;
+  db.ref('instances/'+name).remove();
+  showNotif(`Carte "${name}" supprimée.`);
+}
+
+function copyLink(name){
+  const url=window.location.origin+window.location.pathname.replace('admin.html','carte-musicale.html')+'?map='+encodeURIComponent(name);
+  navigator.clipboard.writeText(url).then(()=>showNotif('Lien copié ! 📋'));
+}
+
+function populateSelects(){
+  ['mod-instance-select','export-select'].forEach(id=>{
+    const sel=document.getElementById(id);
+    if(!sel)return;
+    const prev=sel.value;
+    sel.innerHTML=allInstances.map(n=>`<option value="${n}"${n===prev?'selected':''}>${n}</option>`).join('');
+  });
+}
+
+// ═══════════════════════════════════════
+// MODERATION
+// ═══════════════════════════════════════
+function loadPins(){
+  currentMod=document.getElementById('mod-instance-select').value;
+  db.ref('instances/'+currentMod+'/pins').off();
+  db.ref('instances/'+currentMod+'/pins').on('value', snap=>{
+    allPinsData=snap.val()||{};
+    renderMod();
+  });
+}
+
+function switchTab(tab){
+  currentTab=tab;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  renderMod();
+}
+
+function renderMod(){
+  const pending=[], approved=[];
+  Object.entries(allPinsData).forEach(([countryId,pins])=>{
+    Object.entries(pins).forEach(([key,p])=>{
+      const item={...p,_key:key,_country:countryId};
+      if(p.status==='pending') pending.push(item);
+      else approved.push(item);
+    });
+  });
+  document.getElementById('badge-pending').textContent=pending.length;
+  document.getElementById('badge-approved').textContent=approved.length;
+  const list = currentTab==='pending' ? pending : approved;
+  const container=document.getElementById('pins-container');
+  if(!list.length){container.innerHTML=`<div class="empty-msg">${currentTab==='pending'?'Aucune contribution en attente ✅':'Aucune contribution validée.'}</div>`;return}
+
+  // Country select options
+  const countryOpts = Object.keys(COUNTRY_DATA).map(id=>`<option value="${id}">${COUNTRY_DATA[id]}</option>`).join('');
+
+  container.innerHTML=list.map(p=>{
+    const ytId=getYTId(p.yt);
+    const countryName=getCountryName(p._country);
+    return `<div class="pin-row${p.status==='pending'?' pending':''}">
+      <div class="pin-info">
+        <div class="pin-header">
+          <span class="pin-author">${esc(p.author)}</span>
+          <span class="pin-country" onclick="filterCountry('${p._country}')" title="Filtrer ce pays">${countryName}</span>
+          <span class="pin-date">${p.date}</span>
+        </div>
+        <div class="pin-title">"${esc(p.title)}"</div>
+        <div class="pin-links">
+          ${ytId?`<a class="pin-link" href="https://www.youtube.com/watch?v=${ytId}" target="_blank">▶ YouTube</a>`:''}
+          ${p.img?`<a class="pin-link" href="${esc(p.img)}" target="_blank">🖼 Image</a>`:''}
+        </div>
+        <div style="margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span style="font-size:.72rem;color:var(--muted)">Déplacer vers :</span>
+          <select class="country-select" id="move-${p._key}">
+            ${Object.entries(COUNTRY_DATA).map(([id,name])=>`<option value="${id}"${+id===+p._country?'selected':''}>${name}</option>`).join('')}
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="movePin('${p._country}','${p._key}')">↗ Déplacer</button>
+        </div>
+      </div>
+      <div class="pin-actions">
+        ${p.status==='pending'?`<button class="btn btn-green btn-sm" onclick="approvePin('${p._country}','${p._key}')">✅ Valider</button>`:''}
+        ${p.status==='approved'?`<button class="btn btn-orange btn-sm" onclick="rejectPin('${p._country}','${p._key}')">↩ Refuser</button>`:''}
+        <button class="btn btn-danger btn-sm" onclick="deletePin('${p._country}','${p._key}')">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function approvePin(countryId,key){
+  db.ref('instances/'+currentMod+'/pins/'+countryId+'/'+key+'/status').set('approved');
+  showNotif('Contribution validée ✅');
+}
+function rejectPin(countryId,key){
+  db.ref('instances/'+currentMod+'/pins/'+countryId+'/'+key+'/status').set('pending');
+  showNotif('Contribution repassée en attente.');
+}
+function deletePin(countryId,key){
+  if(!confirm('Supprimer définitivement ?'))return;
+  db.ref('instances/'+currentMod+'/pins/'+countryId+'/'+key).remove();
+  showNotif('Supprimé.');
+}
+function movePin(fromCountry,key){
+  const toCountry=document.getElementById('move-'+key).value;
+  if(+toCountry===+fromCountry){showNotif('Même pays, rien à faire.');return}
+  db.ref('instances/'+currentMod+'/pins/'+fromCountry+'/'+key).once('value',snap=>{
+    const data=snap.val();
+    if(!data)return;
+    db.ref('instances/'+currentMod+'/pins/'+toCountry).push(data);
+    db.ref('instances/'+currentMod+'/pins/'+fromCountry+'/'+key).remove();
+    showNotif(`Déplacé vers ${getCountryName(toCountry)} ✅`);
+  });
+}
+
+// ═══════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════
+async function exportMap(){
+  const instance=document.getElementById('export-select').value;
+  showNotif('Génération en cours…');
+  const snap=await db.ref('instances/'+instance+'/pins').once('value');
+  const raw=snap.val()||{};
+  // Build static data: only approved pins
+  const staticData={};
+  Object.entries(raw).forEach(([cid,pins])=>{
+    const approved=Object.values(pins).filter(p=>p.status==='approved');
+    if(approved.length) staticData[cid]=approved;
+  });
+  const json=JSON.stringify(staticData,null,2);
+  const exportHTML=buildExportHTML(instance,json);
+  const blob=new Blob([exportHTML],{type:'text/html'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`carte-musicale-${instance}-export.html`;
+  a.click();
+  showNotif(`Export "${instance}" téléchargé 📥`);
+}
+
+function buildExportHTML(instanceName, jsonData){
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carte Musicale — ${instanceName}</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"><\/script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"><\/script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=Playfair+Display:ital@0;1&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0e1a26;--surface:#152030;--surface2:#1c2d40;--border:#253a52;--text:#e4edf8;--muted:#5e80a0;--accent:#38a0ff;--shadow:0 4px 20px rgba(0,0,0,.45);--shadow-lg:0 16px 56px rgba(0,0,0,.65)}
+html,body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.logo{font-family:'Playfair Display',serif;font-size:1.05rem;display:flex;align-items:center;gap:8px}
+.archive-badge{background:rgba(255,200,50,.1);border:1px solid rgba(255,200,50,.3);color:#f0c830;border-radius:5px;padding:2px 8px;font-size:.7rem;font-weight:700}
+#map-wrapper{flex:1;position:relative;overflow:hidden;cursor:grab}
+#ocean-canvas{position:absolute;inset:0;pointer-events:none;z-index:0}
+#map-svg{position:absolute;inset:0;width:100%;height:100%;z-index:1}
+.sphere{fill:transparent}.graticule{fill:none;stroke:rgba(255,255,255,.04);stroke-width:.5px}.borders{fill:none;stroke:rgba(0,0,0,.55);stroke-width:.3px}
+.country{stroke:rgba(0,0,0,.35);stroke-width:.3px;cursor:pointer;transition:filter .18s}.country:hover{filter:brightness(1.3)}
+.country.has-pins{stroke:rgba(255,255,160,.55);stroke-width:.7px}
+.pin-group{cursor:pointer}.pin-c{transition:filter .15s}.pin-group:hover .pin-c{filter:brightness(1.4)}
+.pin-lbl{font-family:'Outfit',sans-serif;font-size:7px;font-weight:700;fill:white;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.map-controls{position:absolute;bottom:24px;right:20px;display:flex;flex-direction:column;gap:4px;z-index:50}
+.ctrl-btn{width:36px;height:36px;background:var(--surface);border:1px solid var(--border);border-radius:9px;color:var(--text);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif}
+.map-stats{position:absolute;bottom:24px;left:20px;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:6px 12px;font-size:.72rem;color:var(--muted)}
+.map-stats strong{color:var(--text);font-size:.9rem;font-weight:600}
+#loader{position:absolute;inset:0;background:#0a1520;display:flex;align-items:center;justify-content:center;z-index:200;transition:opacity .5s}
+#loader.done{opacity:0;pointer-events:none}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .75s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:700;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px)}
+.overlay.hidden{display:none}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:24px;width:100%;max-width:560px;box-shadow:var(--shadow-lg)}
+.mhead{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:5px;gap:10px}
+.modal h2{font-family:'Playfair Display',serif;font-size:1.25rem}
+.mclose{background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--muted);width:27px;height:27px;cursor:pointer;font-size:.85rem;display:flex;align-items:center;justify-content:center}
+.msubtitle{color:var(--muted);font-size:.78rem;margin-bottom:14px}
+.mini-wrap{width:100%;height:110px;border-radius:10px;overflow:hidden;border:1px solid var(--border);background:#08141e;margin-bottom:12px}
+#mini-svg{width:100%;height:100%}
+.pin-list{display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto}
+.pin-card{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:11px}
+.pmeta{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}
+.pauthor{font-size:.73rem;font-weight:600;color:var(--muted)}
+.pdate{font-size:.66rem;color:var(--muted)}
+.ptitle{font-weight:600;font-size:.86rem;margin-bottom:7px}
+.yt-frame{width:100%;aspect-ratio:16/9;border-radius:7px;border:none;background:#000}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">🎵 ${instanceName} <span class="archive-badge">ARCHIVE</span></div>
+  <div style="font-size:.75rem;color:var(--muted)">Exporté le ${new Date().toLocaleDateString('fr-FR')}</div>
+</header>
+<div id="map-wrapper">
+  <div id="loader"><div class="spinner"></div></div>
+  <canvas id="ocean-canvas"></canvas>
+  <svg id="map-svg"></svg>
+  <div class="map-controls">
+    <button class="ctrl-btn" onclick="zoomIn()">+</button>
+    <button class="ctrl-btn" style="font-size:.5rem;font-weight:700;letter-spacing:.04em;color:var(--muted)" onclick="zoomReset()">↺</button>
+    <button class="ctrl-btn" onclick="zoomOut()">−</button>
+  </div>
+  <div class="map-stats"><strong id="pin-count">0</strong> musique(s)</div>
+</div>
+<div id="tooltip" style="position:fixed;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:.74rem;pointer-events:none;z-index:600;display:none"></div>
+<div class="overlay hidden" id="country-overlay">
+  <div class="modal">
+    <div class="mhead"><h2 id="country-title"></h2><button class="mclose" onclick="document.getElementById('country-overlay').classList.add('hidden')">✕</button></div>
+    <p class="msubtitle" id="country-subtitle"></p>
+    <div class="mini-wrap"><svg id="mini-svg"></svg></div>
+    <div class="pin-list" id="pin-list"></div>
+    <div style="margin-top:14px;text-align:right"><button style="font-family:Outfit,sans-serif;font-size:.78rem;padding:5px 13px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer" onclick="document.getElementById('country-overlay').classList.add('hidden')">Fermer</button></div>
+  </div>
+</div>
+<script>
+const STATIC_DATA=${jsonData};
+const COUNTRY_DATA={4:'Afghanistan',8:'Albanie',12:'Algérie',20:'Andorre',24:'Angola',31:'Azerbaïdjan',32:'Argentine',36:'Australie',40:'Autriche',44:'Bahamas',48:'Bahreïn',50:'Bangladesh',51:'Arménie',56:'Belgique',64:'Bhoutan',68:'Bolivie',70:'Bosnie-Herzégovine',72:'Botswana',76:'Brésil',84:'Belize',96:'Brunéi',100:'Bulgarie',104:'Myanmar',108:'Burundi',112:'Biélorussie',116:'Cambodge',120:'Cameroun',124:'Canada',144:'Sri Lanka',148:'Tchad',152:'Chili',156:'Chine',158:'Taïwan',170:'Colombie',174:'Comores',180:'Rép. dém. du Congo',188:'Costa Rica',191:'Croatie',192:'Cuba',196:'Chypre',203:'République tchèque',204:'Bénin',208:'Danemark',214:'Rép. dominicaine',218:'Équateur',222:'Salvador',226:'Guinée équatoriale',231:'Éthiopie',233:'Estonie',242:'Fidji',246:'Finlande',250:'France',262:'Djibouti',266:'Gabon',268:'Géorgie',270:'Gambie',276:'Allemagne',288:'Ghana',300:'Grèce',320:'Guatemala',324:'Guinée',328:'Guyana',332:'Haïti',340:'Honduras',348:'Hongrie',352:'Islande',356:'Inde',360:'Indonésie',364:'Iran',368:'Irak',372:'Irlande',376:'Israël',380:'Italie',384:"Côte d'Ivoire",388:'Jamaïque',392:'Japon',398:'Kazakhstan',400:'Jordanie',404:'Kenya',408:'Corée du Nord',410:'Corée du Sud',418:'Laos',422:'Liban',428:'Lettonie',430:'Libéria',434:'Libye',440:'Lituanie',442:'Luxembourg',450:'Madagascar',458:'Malaisie',466:'Mali',478:'Mauritanie',484:'Mexique',496:'Mongolie',498:'Moldavie',499:'Monténégro',504:'Maroc',508:'Mozambique',512:'Oman',516:'Namibie',524:'Népal',528:'Pays-Bas',554:'Nouvelle-Zélande',558:'Nicaragua',562:'Niger',566:'Nigéria',578:'Norvège',586:'Pakistan',591:'Panama',600:'Paraguay',604:'Pérou',608:'Philippines',616:'Pologne',620:'Portugal',634:'Qatar',642:'Roumanie',643:'Russie',646:'Rwanda',682:'Arabie saoudite',686:'Sénégal',688:'Serbie',702:'Singapour',703:'Slovaquie',704:'Vietnam',705:'Slovénie',706:'Somalie',710:'Afrique du Sud',716:'Zimbabwe',724:'Espagne',728:'Soudan du Sud',729:'Soudan',740:'Suriname',752:'Suède',756:'Suisse',760:'Syrie',764:'Thaïlande',768:'Togo',780:'Trinité-et-Tobago',784:'Émirats arabes unis',788:'Tunisie',792:'Turquie',800:'Ouganda',804:'Ukraine',807:'Macédoine du Nord',818:'Égypte',826:'Royaume-Uni',834:'Tanzanie',840:'États-Unis',854:'Burkina Faso',858:'Uruguay',860:'Ouzbékistan',862:'Venezuela',887:'Yémen',894:'Zambie'};
+const CONT_COLOR={'Europe':'#5e9858','Asia':'#c07848','Africa':'#c49040','North America':'#6888b0','South America':'#5a9870','Oceania':'#b87878','Antarctica':'#aabccc'};
+const CONT_MAP={4:'Asia',8:'Europe',12:'Africa',20:'Europe',24:'Africa',31:'Asia',32:'South America',36:'Oceania',40:'Europe',44:'North America',48:'Asia',50:'Asia',51:'Asia',56:'Europe',64:'Asia',68:'South America',70:'Europe',72:'Africa',76:'South America',84:'North America',96:'Asia',100:'Europe',104:'Asia',108:'Africa',112:'Europe',116:'Asia',120:'Africa',124:'North America',144:'Asia',148:'Africa',152:'South America',156:'Asia',158:'Asia',170:'South America',174:'Africa',180:'Africa',188:'North America',191:'Europe',192:'North America',196:'Europe',203:'Europe',204:'Africa',208:'Europe',214:'North America',218:'South America',222:'North America',226:'Africa',231:'Africa',233:'Europe',242:'Oceania',246:'Europe',250:'Europe',262:'Africa',266:'Africa',268:'Asia',270:'Africa',276:'Europe',288:'Africa',300:'Europe',320:'North America',324:'Africa',328:'South America',332:'North America',340:'North America',348:'Europe',352:'Europe',356:'Asia',360:'Asia',364:'Asia',368:'Asia',372:'Europe',376:'Asia',380:'Europe',384:'Africa',388:'North America',392:'Asia',398:'Asia',400:'Asia',404:'Africa',408:'Asia',410:'Asia',418:'Asia',422:'Asia',428:'Europe',430:'Africa',434:'Africa',440:'Europe',442:'Europe',450:'Africa',458:'Asia',466:'Africa',478:'Africa',484:'North America',496:'Asia',498:'Europe',499:'Europe',504:'Africa',508:'Africa',512:'Asia',516:'Africa',524:'Asia',528:'Europe',554:'Oceania',558:'North America',562:'Africa',566:'Africa',578:'Europe',586:'Asia',591:'North America',600:'South America',604:'South America',608:'Asia',616:'Europe',620:'Europe',634:'Asia',642:'Europe',643:'Europe',646:'Africa',682:'Asia',686:'Africa',688:'Europe',702:'Asia',703:'Europe',704:'Asia',705:'Europe',706:'Africa',710:'Africa',716:'Africa',724:'Europe',728:'Africa',729:'Africa',740:'South America',752:'Europe',756:'Europe',760:'Asia',764:'Asia',768:'Africa',780:'North America',784:'Asia',788:'Africa',792:'Asia',800:'Africa',804:'Europe',807:'Europe',818:'Africa',826:'Europe',834:'Africa',840:'North America',854:'Africa',858:'South America',860:'Asia',862:'South America',887:'Asia',894:'Africa'};
+function getName(id){return COUNTRY_DATA[id]||COUNTRY_DATA[+id]||''}
+function getColor(id){const c=CONT_MAP[id]||CONT_MAP[+id]||'Asia';return CONT_COLOR[c]||'#5e8060'}
+function getYTId(url){if(!url)return null;const m=url.match(/(?:youtu\\.be\\/|youtube\\.com\\/(?:watch\\?v=|embed\\/|v\\/|shorts\\/))([A-Za-z0-9_-]{11})/);return m?m[1]:null}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+let allFeatures=[],svgSel,mainG,gCountries,gPins,pathFn,zoomBehavior,proj;
+
+function initOcean(){const canvas=document.getElementById('ocean-canvas');const wrapper=document.getElementById('map-wrapper');canvas.width=wrapper.clientWidth;canvas.height=wrapper.clientHeight;const ctx=canvas.getContext('2d');let t=0;function draw(){const W=canvas.width,H=canvas.height;const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#1a4a7a');g.addColorStop(.4,'#1e5a8a');g.addColorStop(1,'#163d68');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);[{n:6,amp:3.5,freq:.006,speed:.018,alpha:.12,lw:1.2,hue:195},{n:8,amp:2.5,freq:.009,speed:.025,alpha:.09,lw:.9,hue:200}].forEach(l=>{for(let i=0;i<l.n;i++){const y0=H*(i+.5)/l.n,ph=t*l.speed+i*(Math.PI*2/l.n);ctx.beginPath();ctx.moveTo(0,y0);for(let x=0;x<=W;x+=3)ctx.lineTo(x,y0+Math.sin(x*l.freq+ph)*l.amp+Math.sin(x*l.freq*1.7+ph*1.3)*(l.amp*.4));ctx.strokeStyle=\`hsla(\${l.hue},70%,\${65+i*1.5}%,\${l.alpha})\`;ctx.lineWidth=l.lw;ctx.stroke();}});t+=1;requestAnimationFrame(draw);}draw();}
+
+function openCountry(id,name){
+  const pins=STATIC_DATA[id]||STATIC_DATA[+id]||[];
+  document.getElementById('country-title').textContent=name;
+  document.getElementById('country-subtitle').textContent=pins.length?pins.length+' musique'+(pins.length>1?'s':'')+' partagée'+(pins.length>1?'s':'')+' par la classe':'Aucune musique pour ce pays.';
+  const miniSvg=d3.select('#mini-svg');miniSvg.selectAll('*').remove();
+  const node=document.getElementById('mini-svg');const W=node.clientWidth||540,H=node.clientHeight||110;
+  const p2=d3.geoNaturalEarth1().scale(W/6.3).translate([W/2,H/2]);const pFn2=d3.geoPath().projection(p2);
+  miniSvg.append('path').datum({type:'Sphere'}).attr('d',pFn2).attr('fill','#08141e');
+  miniSvg.selectAll('path.mc').data(allFeatures).join('path').attr('class','mc').attr('d',pFn2).attr('fill',d=>+d.id===+id?'#b03030':'#1e3448').attr('stroke',d=>+d.id===+id?'#ff8866':'rgba(0,0,0,.25)').attr('stroke-width',d=>+d.id===+id?.8:.2);
+  const feat=allFeatures.find(f=>+f.id===+id);if(feat){const[cx,cy]=pFn2.centroid(feat);if(isFinite(cx)&&isFinite(cy))miniSvg.append('circle').attr('cx',cx).attr('cy',cy).attr('r',4).attr('fill','#22c55e').attr('stroke','#fff').attr('stroke-width',.8)}
+  document.getElementById('pin-list').innerHTML=pins.map(pin=>{const ytId=getYTId(pin.yt);return\`<div class="pin-card"><div class="pmeta"><span class="pauthor">\${esc(pin.author)}</span><span class="pdate">\${pin.date}</span></div><div class="ptitle">\${esc(pin.title)}</div>\${ytId?\`<iframe class="yt-frame" src="https://www.youtube.com/embed/\${ytId}" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen loading="lazy"></iframe>\`:''}\${pin.img?\`<img src="\${esc(pin.img)}" style="width:100%;border-radius:7px;margin-top:7px;object-fit:cover;max-height:180px" onerror="this.style.display='none'">\`:''}</div>\`}).join('');
+  document.getElementById('country-overlay').classList.remove('hidden');
+}
+
+async function boot(){
+  initOcean();
+  const world=await d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
+  const wrapper=document.getElementById('map-wrapper');const W=wrapper.clientWidth,H=wrapper.clientHeight;
+  svgSel=d3.select('#map-svg');svgSel.selectAll('*').remove();
+  proj=d3.geoNaturalEarth1().scale(W/6.28).translate([W/2,H/2]);
+  pathFn=d3.geoPath().projection(proj);
+  zoomBehavior=d3.zoom().scaleExtent([.6,16]).on('zoom',ev=>mainG.attr('transform',ev.transform));
+  svgSel.call(zoomBehavior);
+  const svgNode=document.getElementById('map-svg');let pdX=0,pdY=0;
+  svgNode.addEventListener('pointerdown',e=>{pdX=e.clientX;pdY=e.clientY});
+  svgNode.addEventListener('pointerup',e=>{
+    if(Math.abs(e.clientX-pdX)>6||Math.abs(e.clientY-pdY)>6)return;
+    const wRect=svgNode.getBoundingClientRect();const tr=d3.zoomTransform(svgNode);
+    const sx=(e.clientX-wRect.left-tr.x)/tr.k,sy=(e.clientY-wRect.top-tr.y)/tr.k;
+    const feat=allFeatures.find(f=>{try{return d3.geoContains(f,proj.invert([sx,sy]))}catch{return false}});
+    if(!feat)return;const name=getName(feat.id);if(!name)return;
+    openCountry(feat.id,name);
+  });
+  mainG=svgSel.append('g');
+  mainG.append('path').datum({type:'Sphere'}).attr('fill','transparent').attr('d',pathFn);
+  mainG.append('path').datum(d3.geoGraticule()()).attr('fill','none').attr('stroke','rgba(255,255,255,.04)').attr('stroke-width',.5).attr('d',pathFn);
+  allFeatures=topojson.feature(world,world.objects.countries).features;
+  gCountries=mainG.append('g');
+  gCountries.selectAll('path.country').data(allFeatures).join('path').attr('class','country').attr('d',pathFn).attr('fill',d=>getColor(d.id)).classed('has-pins',d=>!!(STATIC_DATA[d.id]||STATIC_DATA[+d.id]));
+  mainG.append('path').datum(topojson.mesh(world,world.objects.countries,(a,b)=>a!==b)).attr('class','borders').attr('d',pathFn);
+  gPins=mainG.append('g');
+  let total=0;
+  Object.entries(STATIC_DATA).forEach(([id,pins])=>{
+    if(!pins||!pins.length)return;total+=pins.length;
+    const feat=allFeatures.find(f=>+f.id===+id);if(!feat)return;
+    const[cx,cy]=pathFn.centroid(feat);if(!isFinite(cx)||!isFinite(cy))return;
+    const n=pins.length,r=n>9?8:6.5;
+    const pg=gPins.append('g').attr('class','pin-group').attr('transform',\`translate(\${cx},\${cy})\`);
+    pg.append('line').attr('x1',0).attr('y1',-(r+1)).attr('x2',0).attr('y2',2).attr('stroke','#22c55e').attr('stroke-width',1.3).attr('opacity',.7);
+    pg.append('circle').attr('class','pin-c').attr('cx',0).attr('cy',-(r+5)).attr('r',r).attr('fill','#22c55e').attr('stroke','rgba(0,0,0,.3)').attr('stroke-width',.7);
+    pg.append('text').attr('class','pin-lbl').attr('x',0).attr('y',-(r+5)).text(n>9?'9+':n);
+  });
+  document.getElementById('pin-count').textContent=total;
+  const loader=document.getElementById('loader');loader.classList.add('done');setTimeout(()=>loader.style.display='none',500);
+}
+function zoomIn(){svgSel.transition().duration(300).call(zoomBehavior.scaleBy,1.6)}
+function zoomOut(){svgSel.transition().duration(300).call(zoomBehavior.scaleBy,1/1.6)}
+function zoomReset(){svgSel.transition().duration(400).call(zoomBehavior.transform,d3.zoomIdentity)}
+boot();
+<\/script>
+</body>
+</html>`;
+}
+
+// ═══════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════
+function getYTId(url){if(!url)return null;const m=url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([A-Za-z0-9_-]{11})/);return m?m[1]:null}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function showNotif(msg){const el=document.getElementById('notif');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2800)}
+</script>
+</body>
+</html>
